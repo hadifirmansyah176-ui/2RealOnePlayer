@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="bg">#17202A</color>
+    <color name="text_main">#DDE3EE</color>
+    <color name="text_sub">#8A97A8</color>
+    <color name="seek_blue">#64B5F6</color>
+    <color name="teal">#7DE8D5</color>
+</resources>
