@@ -52,6 +52,7 @@ class MainActivity : AppCompatActivity() {
         b.rv.adapter = adapter
         onBackPressedDispatcher.addCallback(this, backCallback)
 
+        b.btnAbout.setOnClickListener { showAbout() }
         b.btnSearch.setOnClickListener {
             if (b.etSearch.visibility == View.VISIBLE) closeSearch() else openSearch()
         }
@@ -123,6 +124,18 @@ class MainActivity : AppCompatActivity() {
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(b.etSearch.windowToken, 0)
         backCallback.isEnabled = false
+    }
+
+    private fun showAbout() {
+        androidx.appcompat.app.AlertDialog.Builder(this)
+            .setTitle("Tentang")
+            .setMessage(
+                "Aplikasi RealOnePlayer ini hanya untuk hiburan saja tidak diperjual belikan.\n\n" +
+                    "Versi Saat ini : 1.0\n" +
+                    "by.Anonim 11/2026"
+            )
+            .setPositiveButton("Tutup", null)
+            .show()
     }
 
     private fun openVideo(item: VideoItem) {

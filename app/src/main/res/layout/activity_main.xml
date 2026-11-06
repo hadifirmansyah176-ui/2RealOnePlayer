@@ -26,7 +26,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:layout_marginStart="12dp"
-            android:layout_marginEnd="56dp"
+            android:layout_marginEnd="112dp"
             android:background="@null"
             android:hint="Cari judul video…"
             android:imeOptions="actionSearch"
@@ -36,6 +36,16 @@
             android:textColorHint="@color/text_sub"
             android:textSize="18sp"
             android:visibility="gone" />
+
+        <ImageButton
+            android:id="@+id/btnAbout"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:layout_gravity="end"
+            android:layout_marginEnd="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Tentang"
+            android:src="@drawable/ic_info" />
 
         <ImageButton
             android:id="@+id/btnSearch"
