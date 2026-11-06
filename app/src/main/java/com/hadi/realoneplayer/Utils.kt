@@ -1,4 +1,4 @@
-package com.hadi.realoneplayer
+package com.videoh.realoneplayer
 
 import android.content.ContentUris
 import android.content.Context

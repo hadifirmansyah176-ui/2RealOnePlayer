@@ -1,4 +1,4 @@
-package com.hadi.realoneplayer
+package com.videoh.realoneplayer
 
 import android.Manifest
 import android.content.Context
@@ -19,8 +19,8 @@ import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
-import com.hadi.realoneplayer.databinding.ActivityMainBinding
-import com.hadi.realoneplayer.databinding.ItemVideoBinding
+import com.videoh.realoneplayer.databinding.ActivityMainBinding
+import com.videoh.realoneplayer.databinding.ItemVideoBinding
 
 class MainActivity : AppCompatActivity() {
 

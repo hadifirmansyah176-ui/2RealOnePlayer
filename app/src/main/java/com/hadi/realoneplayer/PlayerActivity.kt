@@ -1,4 +1,4 @@
-package com.hadi.realoneplayer
+package com.videoh.realoneplayer
 
 import android.graphics.Color
 import android.graphics.Typeface
@@ -34,7 +34,7 @@ import androidx.media3.common.util.UnstableApi
 import androidx.media3.exoplayer.ExoPlayer
 import androidx.media3.ui.CaptionStyleCompat
 import androidx.media3.ui.SubtitleView
-import com.hadi.realoneplayer.databinding.ActivityPlayerBinding
+import com.videoh.realoneplayer.databinding.ActivityPlayerBinding
 import java.io.File
 import java.util.Locale
 

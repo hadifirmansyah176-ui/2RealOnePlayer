@@ -4,11 +4,11 @@ plugins {
 }
 
 android {
-    namespace 'com.hadi.realoneplayer'
+    namespace 'com.videoh.realoneplayer'
     compileSdk 34
 
     defaultConfig {
-        applicationId "com.hadi.realoneplayer"
+        applicationId "com.videoh.realoneplayer"
         minSdk 21
         targetSdk 34
         versionCode 1
