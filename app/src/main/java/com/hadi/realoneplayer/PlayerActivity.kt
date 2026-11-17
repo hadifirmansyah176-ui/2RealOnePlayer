@@ -1,5 +1,6 @@
 package com.videoh.realoneplayer
 
+import android.annotation.SuppressLint
 import android.graphics.Color
 import android.graphics.Typeface
 import android.media.AudioManager
@@ -11,6 +12,8 @@ import android.os.Bundle
 import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
+import android.view.KeyEvent
+import android.view.MotionEvent
 import android.view.View
 import android.view.WindowManager
 import android.widget.SeekBar
@@ -320,15 +323,78 @@ class PlayerActivity : AppCompatActivity() {
             setControlsVisible(true)
         }
 
-        val am = getSystemService(AUDIO_SERVICE) as AudioManager
-        b.btnVolUp.setOnClickListener {
-            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_RAISE, AudioManager.FLAG_SHOW_UI)
-            setControlsVisible(true)
+        setupVolumeButton(b.btnVolUp, true)
+        setupVolumeButton(b.btnVolDown, false)
+        updateVolumeUi()
+    }
+
+    // ------------------------------------------------------------- volume
+
+    private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
+
+    /** Naik/turun volume TANPA menampilkan panel volume bawaan HP (flag = 0). */
+    private fun changeVolume(up: Boolean) {
+        audioManager.adjustStreamVolume(
+            AudioManager.STREAM_MUSIC,
+            if (up) AudioManager.ADJUST_RAISE else AudioManager.ADJUST_LOWER,
+            0
+        )
+        updateVolumeUi()
+        setControlsVisible(true)
+    }
+
+    private fun updateVolumeUi() {
+        val max = audioManager.getStreamMaxVolume(AudioManager.STREAM_MUSIC)
+        val cur = audioManager.getStreamVolume(AudioManager.STREAM_MUSIC)
+        val pct = if (max > 0) Math.round(cur * 100f / max) else 0
+        b.tvVolPct.text = pct.toString()
+        b.volBar.level = pct
+    }
+
+    /** Tekan sekali = satu langkah; tahan = terus berubah. */
+    @SuppressLint("ClickableViewAccessibility")
+    private fun setupVolumeButton(v: View, up: Boolean) {
+        val repeat = object : Runnable {
+            override fun run() {
+                changeVolume(up)
+                handler.postDelayed(this, 120)
+            }
         }
-        b.btnVolDown.setOnClickListener {
-            am.adjustStreamVolume(AudioManager.STREAM_MUSIC, AudioManager.ADJUST_LOWER, AudioManager.FLAG_SHOW_UI)
-            setControlsVisible(true)
+        v.setOnTouchListener { view, ev ->
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    view.isPressed = true
+                    changeVolume(up)
+                    handler.postDelayed(repeat, 400)
+                }
+                MotionEvent.ACTION_UP, MotionEvent.ACTION_CANCEL -> {
+                    view.isPressed = false
+                    handler.removeCallbacks(repeat)
+                }
+            }
+            true
         }
+    }
+
+    // Tombol volume fisik HP: ditangani sendiri agar panel bawaan tidak muncul (kecuali layar terkunci)
+    override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
+        if (!locked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            changeVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP)
+            return true
+        }
+        return super.onKeyDown(keyCode, event)
+    }
+
+    override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
+        if (!locked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
+            return true
+        }
+        return super.onKeyUp(keyCode, event)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        if (::b.isInitialized && !exiting) updateVolumeUi()
     }
 
     private fun setControlsVisible(visible: Boolean) {

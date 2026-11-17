@@ -13,13 +13,25 @@
             android:id="@+id/tvTitle"
             android:layout_width="wrap_content"
             android:layout_height="match_parent"
+            android:ellipsize="end"
             android:gravity="center_vertical"
+            android:maxLines="1"
+            android:maxWidth="240dp"
             android:paddingStart="20dp"
             android:paddingEnd="20dp"
             android:text="Folder"
             android:textColor="@color/text_main"
             android:textSize="22sp"
             android:textStyle="bold" />
+
+        <ImageButton
+            android:id="@+id/btnUp"
+            android:layout_width="56dp"
+            android:layout_height="56dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="Kembali ke daftar folder"
+            android:src="@drawable/ic_back"
+            android:visibility="gone" />
 
         <EditText
             android:id="@+id/etSearch"

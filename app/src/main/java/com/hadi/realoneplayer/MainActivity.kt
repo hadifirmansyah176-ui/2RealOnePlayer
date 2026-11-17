@@ -26,6 +26,7 @@ import androidx.recyclerview.widget.LinearLayoutManager
 import androidx.recyclerview.widget.RecyclerView
 import com.bumptech.glide.Glide
 import com.videoh.realoneplayer.databinding.ActivityMainBinding
+import com.videoh.realoneplayer.databinding.ItemFolderBinding
 import com.videoh.realoneplayer.databinding.ItemVideoBinding
 import java.io.File
 
@@ -36,7 +37,10 @@ class MainActivity : AppCompatActivity() {
         onClick = { openVideo(it) },
         onLongClick = { showItemMenu(it) }
     )
+    private val folderAdapter = FolderAdapter { enterFolder(it) }
     private var all: List<VideoItem> = emptyList()
+    private var currentFolder: FolderItem? = null
+    private var searchOpen = false
     private var resumeChecked = false
     private var pendingDelete: VideoItem? = null
 
@@ -72,7 +76,9 @@ class MainActivity : AppCompatActivity() {
         }
 
     private val backCallback = object : OnBackPressedCallback(false) {
-        override fun handleOnBackPressed() = closeSearch()
+        override fun handleOnBackPressed() {
+            if (searchOpen) closeSearch() else if (currentFolder != null) exitFolder()
+        }
     }
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -82,12 +88,13 @@ class MainActivity : AppCompatActivity() {
         resumeChecked = savedInstanceState != null
 
         b.rv.layoutManager = LinearLayoutManager(this)
-        b.rv.adapter = adapter
+        b.rv.adapter = folderAdapter
         onBackPressedDispatcher.addCallback(this, backCallback)
 
+        b.btnUp.setOnClickListener { exitFolder() }
         b.btnAbout.setOnClickListener { showAbout() }
         b.btnSearch.setOnClickListener {
-            if (b.etSearch.visibility == View.VISIBLE) closeSearch() else openSearch()
+            if (searchOpen) closeSearch() else openSearch()
         }
         b.etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) = applyFilter()
@@ -126,15 +133,62 @@ class MainActivity : AppCompatActivity() {
         applyFilter()
     }
 
+    private fun keyOf(v: VideoItem): String =
+        v.path?.substringBeforeLast('/', "")?.ifEmpty { null } ?: v.folder
+
     private fun applyFilter() {
         val q = b.etSearch.text.toString().trim()
-        val list = if (q.isEmpty()) all else all.filter { it.title.contains(q, ignoreCase = true) }
+        val folder = currentFolder
+
+        // Tampilan awal: hanya daftar folder
+        if (folder == null && q.isEmpty()) {
+            val folders = all.groupBy { keyOf(it) }
+                .map { (key, list) ->
+                    FolderItem(key, list.first().folder.ifBlank { "Tanpa folder" }, list.size)
+                }
+                .sortedBy { it.name.lowercase() }
+            if (b.rv.adapter !== folderAdapter) b.rv.adapter = folderAdapter
+            folderAdapter.submit(folders)
+            if (folders.isEmpty()) showEmpty("Tidak ada video ditemukan.") else b.tvEmpty.visibility = View.GONE
+            return
+        }
+
+        // Di dalam folder (atau hasil pencarian): daftar video
+        val base = if (folder != null) all.filter { keyOf(it) == folder.key } else all
+        if (folder != null && base.isEmpty()) {   // folder sudah kosong
+            exitFolder()
+            return
+        }
+        val list = if (q.isEmpty()) base else base.filter { it.title.contains(q, ignoreCase = true) }
+        if (b.rv.adapter !== adapter) b.rv.adapter = adapter
         adapter.submit(list)
         if (list.isEmpty()) {
             showEmpty(if (q.isEmpty()) "Tidak ada video ditemukan." else "Video tidak ditemukan.")
         } else {
             b.tvEmpty.visibility = View.GONE
         }
+    }
+
+    private fun enterFolder(f: FolderItem) {
+        currentFolder = f
+        updateTitle()
+        applyFilter()
+    }
+
+    private fun exitFolder() {
+        currentFolder = null
+        updateTitle()
+        applyFilter()
+    }
+
+    private fun updateTitle() {
+        val f = currentFolder
+        b.tvTitle.text = f?.name ?: "Folder"
+        val dp = resources.displayMetrics.density
+        b.tvTitle.setPadding((if (f != null) 56 * dp else 20 * dp).toInt(), 0, (20 * dp).toInt(), 0)
+        b.tvTitle.visibility = if (searchOpen) View.GONE else View.VISIBLE
+        b.btnUp.visibility = if (f != null && !searchOpen) View.VISIBLE else View.GONE
+        backCallback.isEnabled = searchOpen || f != null
     }
 
     private fun showEmpty(msg: String) {
@@ -145,21 +199,22 @@ class MainActivity : AppCompatActivity() {
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
     private fun openSearch() {
-        b.tvTitle.visibility = View.GONE
+        searchOpen = true
         b.etSearch.visibility = View.VISIBLE
+        updateTitle()
         b.etSearch.requestFocus()
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
             .showSoftInput(b.etSearch, InputMethodManager.SHOW_IMPLICIT)
-        backCallback.isEnabled = true
     }
 
     private fun closeSearch() {
+        searchOpen = false
         b.etSearch.setText("")
         b.etSearch.visibility = View.GONE
-        b.tvTitle.visibility = View.VISIBLE
         (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
             .hideSoftInputFromWindow(b.etSearch.windowToken, 0)
-        backCallback.isEnabled = false
+        updateTitle()
+        applyFilter()
     }
 
     private fun showAbout() {
@@ -303,5 +358,32 @@ class VideoAdapter(
         Glide.with(holder.b.ivThumb).load(item.uri).centerCrop().into(holder.b.ivThumb)
         holder.b.root.setOnClickListener { onClick(item) }
         holder.b.root.setOnLongClickListener { onLongClick(item); true }
+    }
+}
+
+data class FolderItem(val key: String, val name: String, val count: Int)
+
+class FolderAdapter(private val onClick: (FolderItem) -> Unit) :
+    RecyclerView.Adapter<FolderAdapter.VH>() {
+
+    private var data: List<FolderItem> = emptyList()
+
+    fun submit(list: List<FolderItem>) {
+        data = list
+        notifyDataSetChanged()
+    }
+
+    class VH(val b: ItemFolderBinding) : RecyclerView.ViewHolder(b.root)
+
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
+        VH(ItemFolderBinding.inflate(LayoutInflater.from(parent.context), parent, false))
+
+    override fun getItemCount() = data.size
+
+    override fun onBindViewHolder(holder: VH, position: Int) {
+        val f = data[position]
+        holder.b.tvFolderName.text = f.name
+        holder.b.tvFolderCount.text = "${f.count} video"
+        holder.b.root.setOnClickListener { onClick(f) }
     }
 }
