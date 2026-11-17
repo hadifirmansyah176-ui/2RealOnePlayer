@@ -9,7 +9,11 @@ import java.util.Locale
 data class VideoItem(
     val id: Long,
     val title: String,
+    val fileName: String,
     val duration: Long,
+    val size: Long,
+    val mime: String?,
+    val modified: Long,
     val folder: String,
     val path: String?,
     val uri: Uri
@@ -40,7 +44,10 @@ object VideoRepo {
             MediaStore.Video.Media.DISPLAY_NAME,
             MediaStore.Video.Media.DURATION,
             MediaStore.Video.Media.BUCKET_DISPLAY_NAME,
-            MediaStore.Video.Media.DATA
+            MediaStore.Video.Media.DATA,
+            MediaStore.Video.Media.SIZE,
+            MediaStore.Video.Media.MIME_TYPE,
+            MediaStore.Video.Media.DATE_MODIFIED
         )
         try {
             ctx.contentResolver.query(
@@ -52,6 +59,9 @@ object VideoRepo {
                 val iDur = c.getColumnIndexOrThrow(MediaStore.Video.Media.DURATION)
                 val iBucket = c.getColumnIndexOrThrow(MediaStore.Video.Media.BUCKET_DISPLAY_NAME)
                 val iData = c.getColumnIndexOrThrow(MediaStore.Video.Media.DATA)
+                val iSize = c.getColumnIndexOrThrow(MediaStore.Video.Media.SIZE)
+                val iMime = c.getColumnIndexOrThrow(MediaStore.Video.Media.MIME_TYPE)
+                val iMod = c.getColumnIndexOrThrow(MediaStore.Video.Media.DATE_MODIFIED)
                 while (c.moveToNext()) {
                     val id = c.getLong(iId)
                     val name = c.getString(iName) ?: "Video $id"
@@ -59,7 +69,11 @@ object VideoRepo {
                         VideoItem(
                             id = id,
                             title = name.substringBeforeLast('.'),
+                            fileName = name,
                             duration = c.getLong(iDur),
+                            size = c.getLong(iSize),
+                            mime = c.getString(iMime),
+                            modified = c.getLong(iMod),
                             folder = c.getString(iBucket) ?: "",
                             path = c.getString(iData),
                             uri = ContentUris.withAppendedId(
