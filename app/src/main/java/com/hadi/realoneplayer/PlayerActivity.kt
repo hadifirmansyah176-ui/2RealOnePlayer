@@ -1,6 +1,20 @@
 package com.videoh.realoneplayer
 
 import android.annotation.SuppressLint
+import android.Manifest
+import android.content.ContentValues
+import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.graphics.Bitmap
+import android.media.MediaMetadataRetriever
+import android.os.Environment
+import android.provider.MediaStore
+import android.view.TextureView
+import android.view.ViewConfiguration
+import androidx.core.content.ContextCompat
+import androidx.media3.common.VideoSize
+import java.text.SimpleDateFormat
+import java.util.Date
 import android.graphics.Color
 import android.graphics.Typeface
 import android.media.AudioManager
@@ -57,6 +71,23 @@ class PlayerActivity : AppCompatActivity() {
     private var exiting = false
     private var autoSubDone = false
     private var userDisabledSub = false
+
+    // Ketuk 3x layar = tangkapan layar
+    private var tapCount = 0
+    private var lastTapTime = 0L
+    private var downX = 0f
+    private var downY = 0f
+    private var downTime = 0L
+    private var controlsBeforeTaps = true
+    private var pendingShot: Bitmap? = null
+
+    private val writePermLauncher =
+        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+            val bmp = pendingShot
+            pendingShot = null
+            if (granted && bmp != null) saveShot(bmp)
+            else toast("Izin penyimpanan ditolak")
+        }
 
     // Bass / penguat suara hingga 200%
     private var bassOn = false
@@ -167,6 +198,10 @@ class PlayerActivity : AppCompatActivity() {
                 applyBass(audioSessionId)
             }
 
+            override fun onVideoSizeChanged(videoSize: VideoSize) {
+                applyOrientation(videoSize.width, videoSize.height, videoSize.unappliedRotationDegrees)
+            }
+
             override fun onTracksChanged(tracks: Tracks) {
                 if (autoSubDone || userDisabledSub) return
                 val groups = tracks.groups.filter { it.type == C.TRACK_TYPE_TEXT }
@@ -186,6 +221,7 @@ class PlayerActivity : AppCompatActivity() {
     private fun playIndex(i: Int, pos: Long = 0L, extraSub: Uri? = null, extraName: String? = null) {
         index = i
         val item = items[i]
+        preDetectOrientation(item)
         autoSubDone = false
         if (extraSub == null) userDisabledSub = false
 
@@ -480,6 +516,126 @@ class PlayerActivity : AppCompatActivity() {
         try { bassBoost?.release() } catch (_: Exception) {}
         enhancer = null
         bassBoost = null
+    }
+
+    // ---------------------------------------------- orientasi otomatis
+
+    /** Video landscape -> layar landscape, video potret -> layar potret. */
+    private fun applyOrientation(w: Int, h: Int, rotation: Int = 0) {
+        if (w <= 0 || h <= 0) return
+        val portrait = if (rotation == 90 || rotation == 270) w > h else h > w
+        val target = if (portrait) ActivityInfo.SCREEN_ORIENTATION_SENSOR_PORTRAIT
+        else ActivityInfo.SCREEN_ORIENTATION_SENSOR_LANDSCAPE
+        if (requestedOrientation != target) requestedOrientation = target
+    }
+
+    /** Baca ukuran video lebih awal supaya layar langsung berputar sebelum video tampil. */
+    private fun preDetectOrientation(item: VideoItem) {
+        try {
+            val r = MediaMetadataRetriever()
+            r.setDataSource(this, item.uri)
+            val w = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_WIDTH)?.toIntOrNull() ?: 0
+            val h = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_HEIGHT)?.toIntOrNull() ?: 0
+            val rot = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
+            r.release()
+            applyOrientation(w, h, rot)
+        } catch (_: Exception) {
+        }
+    }
+
+    // ---------------------------------------- ketuk 3x = tangkapan layar
+
+    private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
+
+    override fun dispatchTouchEvent(ev: MotionEvent?): Boolean {
+        if (ev == null) return super.dispatchTouchEvent(ev)
+        when (ev.actionMasked) {
+            MotionEvent.ACTION_DOWN -> {
+                downX = ev.x
+                downY = ev.y
+                downTime = ev.eventTime
+                if (ev.eventTime - lastTapTime > 500L) tapCount = 0
+                if (tapCount == 0) controlsBeforeTaps = controlsVisible
+            }
+            MotionEvent.ACTION_UP -> {
+                val slop = ViewConfiguration.get(this).scaledTouchSlop
+                val moved = Math.hypot((ev.x - downX).toDouble(), (ev.y - downY).toDouble())
+                val isTap = ev.eventTime - downTime < 300L && moved < slop
+                if (isTap) {
+                    tapCount++
+                    lastTapTime = ev.eventTime
+                    if (tapCount >= 3) {
+                        tapCount = 0
+                        val handled = super.dispatchTouchEvent(ev)
+                        // kembalikan tampilan tombol seperti sebelum diketuk 3x
+                        setControlsVisible(controlsBeforeTaps)
+                        takeScreenshot()
+                        return handled
+                    }
+                } else {
+                    tapCount = 0
+                }
+            }
+            MotionEvent.ACTION_CANCEL -> tapCount = 0
+        }
+        return super.dispatchTouchEvent(ev)
+    }
+
+    private fun takeScreenshot() {
+        val tv = b.playerView.videoSurfaceView as? TextureView
+        val bmp = try { tv?.getBitmap() } catch (_: Exception) { null }
+        if (bmp == null) {
+            toast("Tangkapan layar gagal")
+            return
+        }
+        if (Build.VERSION.SDK_INT <= 28 && ContextCompat.checkSelfPermission(
+                this, Manifest.permission.WRITE_EXTERNAL_STORAGE
+            ) != PackageManager.PERMISSION_GRANTED
+        ) {
+            pendingShot = bmp
+            writePermLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
+            return
+        }
+        saveShot(bmp)
+    }
+
+    @Suppress("DEPRECATION")
+    private fun saveShot(bmp: Bitmap) {
+        Thread {
+            val ok = try {
+                val name = "RealOne_" +
+                    SimpleDateFormat("yyyyMMdd_HHmmss", Locale.US).format(Date()) + ".jpg"
+                val values = ContentValues().apply {
+                    put(MediaStore.Images.Media.DISPLAY_NAME, name)
+                    put(MediaStore.Images.Media.MIME_TYPE, "image/jpeg")
+                    if (Build.VERSION.SDK_INT >= 29) {
+                        put(MediaStore.Images.Media.RELATIVE_PATH, "Pictures/RealOnePlayer")
+                        put(MediaStore.Images.Media.IS_PENDING, 1)
+                    } else {
+                        val dir = File(
+                            Environment.getExternalStoragePublicDirectory(Environment.DIRECTORY_PICTURES),
+                            "RealOnePlayer"
+                        )
+                        dir.mkdirs()
+                        put(MediaStore.Images.Media.DATA, File(dir, name).absolutePath)
+                    }
+                }
+                val uri = contentResolver.insert(MediaStore.Images.Media.EXTERNAL_CONTENT_URI, values)
+                    ?: throw IllegalStateException("insert gagal")
+                contentResolver.openOutputStream(uri)?.use { bmp.compress(Bitmap.CompressFormat.JPEG, 95, it) }
+                if (Build.VERSION.SDK_INT >= 29) {
+                    values.clear()
+                    values.put(MediaStore.Images.Media.IS_PENDING, 0)
+                    contentResolver.update(uri, values, null, null)
+                }
+                true
+            } catch (e: Exception) {
+                false
+            }
+            runOnUiThread {
+                toast(if (ok) "Tangkapan layar tersimpan di Galeri (Pictures/RealOnePlayer)" else "Gagal menyimpan tangkapan layar")
+            }
+        }.start()
     }
 
     // ------------------------------------------------------------- lifecycle

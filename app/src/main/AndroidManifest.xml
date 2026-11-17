@@ -26,7 +26,6 @@
         <activity
             android:name=".PlayerActivity"
             android:exported="false"
-            android:screenOrientation="sensorLandscape"
             android:configChanges="orientation|screenSize|keyboardHidden|screenLayout|smallestScreenSize|uiMode"
             android:theme="@style/PlayerTheme" />
     </application>

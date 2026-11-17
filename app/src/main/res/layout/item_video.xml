@@ -49,15 +49,5 @@
             android:maxLines="2"
             android:textColor="@color/text_main"
             android:textSize="15sp" />
-
-        <TextView
-            android:id="@+id/tvFolder"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="4dp"
-            android:ellipsize="end"
-            android:maxLines="1"
-            android:textColor="@color/teal"
-            android:textSize="13sp" />
     </LinearLayout>
 </LinearLayout>

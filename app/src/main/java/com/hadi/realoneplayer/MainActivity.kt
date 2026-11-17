@@ -226,11 +226,6 @@ class MainActivity : AppCompatActivity() {
                     "by.Anonim 11/2026"
             )
             .setPositiveButton("Tutup", null)
-            .setNeutralButton("Tampilkan Semua Video") { _, _ ->
-                Prefs.clearHidden(this)
-                refresh()
-                toast("Semua video ditampilkan kembali")
-            }
             .show()
     }
 
@@ -353,7 +348,6 @@ class VideoAdapter(
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = data[position]
         holder.b.tvName.text = item.title
-        holder.b.tvFolder.text = "\uD83D\uDCC1 " + item.folder.ifBlank { "Tanpa folder" }
         holder.b.tvDur.text = fmtTime(item.duration)
         Glide.with(holder.b.ivThumb).load(item.uri).centerCrop().into(holder.b.ivThumb)
         holder.b.root.setOnClickListener { onClick(item) }
