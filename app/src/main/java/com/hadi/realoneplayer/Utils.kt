@@ -91,6 +91,17 @@ object Prefs {
     fun lastId(c: Context) = p(c).getLong("id", -1L)
     fun lastPos(c: Context) = p(c).getLong("pos", 0L)
 
+    // Video yang dihapus dari daftar putar (file asli tidak dihapus)
+    fun hidden(c: Context): Set<String> = p(c).getStringSet("hidden", emptySet()) ?: emptySet()
+
+    fun hide(c: Context, id: Long) {
+        val s = HashSet(hidden(c))
+        s.add(id.toString())
+        p(c).edit().putStringSet("hidden", s).apply()
+    }
+
+    fun clearHidden(c: Context) = p(c).edit().remove("hidden").apply()
+
     fun bassOn(c: Context) = p(c).getBoolean("bass", false)
     fun setBass(c: Context, on: Boolean) = p(c).edit().putBoolean("bass", on).apply()
 }
