@@ -54,31 +54,24 @@ class MainActivity : AppCompatActivity() {
         get() = if (Build.VERSION.SDK_INT >= 33) Manifest.permission.READ_MEDIA_VIDEO
         else Manifest.permission.READ_EXTERNAL_STORAGE
 
-    private val permLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            if (granted) onGranted() else showEmpty("Izin akses video diperlukan untuk menampilkan daftar video.")
-        }
+    private val permLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        if (granted) onGranted() else showEmpty("Izin akses video diperlukan untuk menampilkan daftar video.")
+    }
 
-    // Izin tulis (khusus Android 9 ke bawah) untuk menghapus file asli
-    private val writePermLauncher =
-        registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
-            val action = afterWritePerm
-            afterWritePerm = null
-            if (granted) action?.invoke() else toast("Izin untuk menghapus file ditolak")
-        }
+    private val writePermLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+        val action = afterWritePerm
+        afterWritePerm = null
+        if (granted) action?.invoke() else toast("Izin untuk menghapus file ditolak")
+    }
 
-    // Konfirmasi penghapusan dari sistem (Android 10 ke atas)
-    private val deleteLauncher =
-        registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
-            val item = pendingDelete
-            pendingDelete = null
-            if (item == null) return@registerForActivityResult
-            if (res.resultCode == RESULT_OK) {
-                if (Build.VERSION.SDK_INT == 29) deleteApi29(item) else afterDelete(true)
-            } else {
-                toast("Penghapusan dibatalkan")
-            }
-        }
+    private val deleteLauncher = registerForActivityResult(ActivityResultContracts.StartIntentSenderForResult()) { res ->
+        val item = pendingDelete
+        pendingDelete = null
+        if (item == null) return@registerForActivityResult
+        if (res.resultCode == RESULT_OK) {
+            if (Build.VERSION.SDK_INT == 29) deleteApi29(item) else afterDelete(true)
+        } else toast("Penghapusan dibatalkan")
+    }
 
     private val backCallback = object : OnBackPressedCallback(false) {
         override fun handleOnBackPressed() {
@@ -91,22 +84,17 @@ class MainActivity : AppCompatActivity() {
         b = ActivityMainBinding.inflate(layoutInflater)
         setContentView(b.root)
         resumeChecked = savedInstanceState != null
-
         b.rv.layoutManager = LinearLayoutManager(this)
         b.rv.adapter = folderAdapter
         onBackPressedDispatcher.addCallback(this, backCallback)
-
         b.btnUp.setOnClickListener { exitFolder() }
         b.btnAbout.setOnClickListener { showAbout() }
-        b.btnSearch.setOnClickListener {
-            if (searchOpen) closeSearch() else openSearch()
-        }
+        b.btnSearch.setOnClickListener { if (searchOpen) closeSearch() else openSearch() }
         b.etSearch.addTextChangedListener(object : TextWatcher {
             override fun afterTextChanged(s: Editable?) = applyFilter()
             override fun beforeTextChanged(s: CharSequence?, st: Int, c: Int, a: Int) {}
-            override fun onTextChanged(s: CharSequence?, st: Int, b: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, st: Int, before: Int, count: Int) {}
         })
-
         if (hasPermission()) onGranted() else permLauncher.launch(permission)
     }
 
@@ -115,19 +103,15 @@ class MainActivity : AppCompatActivity() {
         if (hasPermission() && resumeChecked) refresh()
     }
 
-    private fun hasPermission() =
-        ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
+    private fun hasPermission() = ContextCompat.checkSelfPermission(this, permission) == PackageManager.PERMISSION_GRANTED
 
     private fun onGranted() {
         refresh()
         if (!resumeChecked) {
             resumeChecked = true
-            // Jika sebelumnya keluar mendadak saat menonton, lanjutkan video terakhir.
             if (Prefs.watching(this) && Prefs.lastId(this) != -1L) {
-                val intent = Intent(this, PlayerActivity::class.java)
-                    .putExtra("id", Prefs.lastId(this))
-                    .putExtra("pos", Prefs.lastPos(this))
-                startActivity(intent)
+                startActivity(Intent(this, PlayerActivity::class.java)
+                    .putExtra("id", Prefs.lastId(this)).putExtra("pos", Prefs.lastPos(this)))
             }
         }
     }
@@ -138,53 +122,31 @@ class MainActivity : AppCompatActivity() {
         applyFilter()
     }
 
-    private fun keyOf(v: VideoItem): String =
-        v.path?.substringBeforeLast('/', "")?.ifEmpty { null } ?: v.folder
+    private fun keyOf(v: VideoItem): String = v.path?.substringBeforeLast('/', "")?.ifEmpty { null } ?: v.folder
 
     private fun applyFilter() {
         val q = b.etSearch.text.toString().trim()
         val folder = currentFolder
-
-        // Tampilan awal: hanya daftar folder
         if (folder == null && q.isEmpty()) {
-            val folders = all.groupBy { keyOf(it) }
-                .map { (key, list) ->
-                    FolderItem(key, list.first().folder.ifBlank { "Tanpa folder" }, list.size)
-                }
-                .sortedBy { it.name.lowercase() }
+            val folders = all.groupBy { keyOf(it) }.map { (key, list) ->
+                FolderItem(key, list.first().folder.ifBlank { "Tanpa folder" }, list.size)
+            }.sortedBy { it.name.lowercase() }
             if (b.rv.adapter !== folderAdapter) b.rv.adapter = folderAdapter
             folderAdapter.submit(folders)
             if (folders.isEmpty()) showEmpty("Tidak ada video ditemukan.") else b.tvEmpty.visibility = View.GONE
             return
         }
-
-        // Di dalam folder (atau hasil pencarian): daftar video
         val base = if (folder != null) all.filter { keyOf(it) == folder.key } else all
-        if (folder != null && base.isEmpty()) {
-            exitFolder()
-            return
-        }
+        if (folder != null && base.isEmpty()) { exitFolder(); return }
         val list = if (q.isEmpty()) base else base.filter { it.title.contains(q, ignoreCase = true) }
         if (b.rv.adapter !== adapter) b.rv.adapter = adapter
         adapter.submit(list)
-        if (list.isEmpty()) {
-            showEmpty(if (q.isEmpty()) "Tidak ada video ditemukan." else "Video tidak ditemukan.")
-        } else {
-            b.tvEmpty.visibility = View.GONE
-        }
+        if (list.isEmpty()) showEmpty(if (q.isEmpty()) "Tidak ada video ditemukan." else "Video tidak ditemukan.")
+        else b.tvEmpty.visibility = View.GONE
     }
 
-    private fun enterFolder(f: FolderItem) {
-        currentFolder = f
-        updateTitle()
-        applyFilter()
-    }
-
-    private fun exitFolder() {
-        currentFolder = null
-        updateTitle()
-        applyFilter()
-    }
+    private fun enterFolder(f: FolderItem) { currentFolder = f; updateTitle(); applyFilter() }
+    private fun exitFolder() { currentFolder = null; updateTitle(); applyFilter() }
 
     private fun updateTitle() {
         val f = currentFolder
@@ -196,64 +158,43 @@ class MainActivity : AppCompatActivity() {
         backCallback.isEnabled = searchOpen || f != null
     }
 
-    private fun showEmpty(msg: String) {
-        b.tvEmpty.text = msg
-        b.tvEmpty.visibility = View.VISIBLE
-    }
+    private fun showEmpty(msg: String) { b.tvEmpty.text = msg; b.tvEmpty.visibility = View.VISIBLE }
 
     private fun openSearch() {
         searchOpen = true
         b.etSearch.visibility = View.VISIBLE
         updateTitle()
         b.etSearch.requestFocus()
-        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-            .showSoftInput(b.etSearch, InputMethodManager.SHOW_IMPLICIT)
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).showSoftInput(b.etSearch, InputMethodManager.SHOW_IMPLICIT)
     }
 
     private fun closeSearch() {
         searchOpen = false
         b.etSearch.setText("")
         b.etSearch.visibility = View.GONE
-        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager)
-            .hideSoftInputFromWindow(b.etSearch.windowToken, 0)
+        (getSystemService(Context.INPUT_METHOD_SERVICE) as InputMethodManager).hideSoftInputFromWindow(b.etSearch.windowToken, 0)
         updateTitle()
         applyFilter()
     }
 
     private fun showAbout() {
-        AlertDialog.Builder(this)
-            .setTitle("Tentang")
-            .setMessage(
-                "Aplikasi RealOnePlayer ini hanya untuk hiburan saja tidak diperjual belikan.\n\n" +
-                    "Versi Saat ini : V.1.0\n" +
-                    "by.Anonim 11/2026"
-            )
-            .setPositiveButton("Tutup", null)
-            .show()
+        AlertDialog.Builder(this).setTitle("Tentang")
+            .setMessage("Aplikasi RealOnePlayer ini hanya untuk hiburan saja tidak diperjual belikan.\n\nVersi Saat ini : V.1.0\nby.Anonim 11/2026")
+            .setPositiveButton("Tutup", null).show()
     }
 
     private fun toast(msg: String) = Toast.makeText(this, msg, Toast.LENGTH_SHORT).show()
 
-    // ------------------------------------------------- tekan & tahan video
-
     private fun showItemMenu(item: VideoItem) {
-        AlertDialog.Builder(this)
-            .setTitle(item.title)
+        AlertDialog.Builder(this).setTitle(item.title)
             .setItems(arrayOf("Hapus Dari Daftar Putar", "Hapus Juga File Asli nya", "Info")) { _, which ->
                 when (which) {
-                    0 -> {
-                        Prefs.hide(this, item.id)
-                        refresh()
-                        toast("Dihapus dari daftar putar")
-                    }
+                    0 -> { Prefs.hide(this, item.id); refresh(); toast("Dihapus dari daftar putar") }
                     1 -> confirmDeleteFile(item)
                     2 -> showInfo(item)
                 }
-            }
-            .show()
+            }.show()
     }
-
-    // ----- Info (detail video)
 
     private fun showInfo(v: VideoItem) {
         val df = SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault())
@@ -267,11 +208,7 @@ class MainActivity : AppCompatActivity() {
             append("Format: ").append(v.mime ?: v.fileName.substringAfterLast('.', "-").uppercase()).append("\n")
             if (v.modified > 0) append("Diubah: ").append(df.format(Date(v.modified * 1000)))
         }.trimEnd()
-        AlertDialog.Builder(this)
-            .setTitle("Informasi Video")
-            .setMessage(msg)
-            .setPositiveButton("Tutup", null)
-            .show()
+        AlertDialog.Builder(this).setTitle("Informasi Video").setMessage(msg).setPositiveButton("Tutup", null).show()
     }
 
     private fun resolutionOf(v: VideoItem): String? = try {
@@ -282,27 +219,16 @@ class MainActivity : AppCompatActivity() {
         val rot = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
         r.release()
         if (w <= 0 || h <= 0) null else if (rot == 90 || rot == 270) "$h x $w" else "$w x $h"
-    } catch (_: Exception) {
-        null
-    }
-
-    // ----- Hapus juga file asli
+    } catch (_: Exception) { null }
 
     private fun confirmDeleteFile(item: VideoItem) {
-        AlertDialog.Builder(this)
-            .setTitle("Hapus")
+        AlertDialog.Builder(this).setTitle("Hapus")
             .setMessage("Berkas berikut akan dihapus secara permanen.\n\n${item.fileName}")
-            .setNegativeButton("Batal", null)
-            .setPositiveButton("Oke") { _, _ -> deleteOriginal(item) }
-            .show()
+            .setNegativeButton("Batal", null).setPositiveButton("Oke") { _, _ -> deleteOriginal(item) }.show()
     }
 
     private fun deleteOriginal(item: VideoItem) {
-        when {
-            Build.VERSION.SDK_INT >= 30 -> deleteApi30(item)
-            Build.VERSION.SDK_INT == 29 -> deleteApi29(item)
-            else -> withWritePermission { deleteLegacy(item) }
-        }
+        when { Build.VERSION.SDK_INT >= 30 -> deleteApi30(item); Build.VERSION.SDK_INT == 29 -> deleteApi29(item); else -> withWritePermission { deleteLegacy(item) } }
     }
 
     @RequiresApi(30)
@@ -311,80 +237,53 @@ class MainActivity : AppCompatActivity() {
             val pi = MediaStore.createDeleteRequest(contentResolver, listOf(item.uri))
             pendingDelete = item
             deleteLauncher.launch(IntentSenderRequest.Builder(pi.intentSender).build())
-        } catch (e: Exception) {
-            toast("Gagal menghapus file")
-        }
+        } catch (_: Exception) { toast("Gagal menghapus file") }
     }
 
     @RequiresApi(29)
     private fun deleteApi29(item: VideoItem) {
-        try {
-            afterDelete(contentResolver.delete(item.uri, null, null) > 0)
-        } catch (e: RecoverableSecurityException) {
+        try { afterDelete(contentResolver.delete(item.uri, null, null) > 0) }
+        catch (e: RecoverableSecurityException) {
             pendingDelete = item
-            deleteLauncher.launch(
-                IntentSenderRequest.Builder(e.userAction.actionIntent.intentSender).build()
-            )
-        } catch (e: Exception) {
-            toast("Gagal menghapus file")
-        }
+            deleteLauncher.launch(IntentSenderRequest.Builder(e.userAction.actionIntent.intentSender).build())
+        } catch (_: Exception) { toast("Gagal menghapus file") }
     }
 
     @Suppress("DEPRECATION")
     private fun deleteLegacy(item: VideoItem) {
         var ok = false
-        try {
-            ok = contentResolver.delete(item.uri, null, null) > 0
-        } catch (_: Exception) {
-        }
-        if (!ok) {
-            item.path?.let { ok = try { File(it).delete() } catch (_: Exception) { false } }
-        }
+        try { ok = contentResolver.delete(item.uri, null, null) > 0 } catch (_: Exception) {}
+        if (!ok) item.path?.let { ok = try { File(it).delete() } catch (_: Exception) { false } }
         afterDelete(ok)
     }
 
-    private fun afterDelete(ok: Boolean) {
-        toast(if (ok) "File dihapus" else "Gagal menghapus file")
-        refresh()
-    }
+    private fun afterDelete(ok: Boolean) { toast(if (ok) "File dihapus" else "Gagal menghapus file"); refresh() }
 
     private fun withWritePermission(action: () -> Unit) {
-        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE)
-            == PackageManager.PERMISSION_GRANTED
-        ) {
-            action()
-        } else {
-            afterWritePerm = action
-            writePermLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE)
-        }
+        if (ContextCompat.checkSelfPermission(this, Manifest.permission.WRITE_EXTERNAL_STORAGE) == PackageManager.PERMISSION_GRANTED) action()
+        else { afterWritePerm = action; writePermLauncher.launch(Manifest.permission.WRITE_EXTERNAL_STORAGE) }
     }
 
     private fun openVideo(item: VideoItem) {
-        Playlist.items = adapter.current
-        startActivity(Intent(this, PlayerActivity::class.java).putExtra("id", item.id))
+        val visibleVideos = adapter.current
+        AlertDialog.Builder(this)
+            .setTitle("Pilih cara memutar")
+            .setItems(arrayOf("Putar semua video", "Putar video ini saja")) { _, which ->
+                // Daftar yang sedang tampil (folder atau hasil pencarian) menjadi konteks tombol next/previous.
+                Playlist.items = if (which == 0) visibleVideos else listOf(item)
+                startActivity(Intent(this, PlayerActivity::class.java).putExtra("id", item.id))
+            }
+            .show()
     }
 }
 
-class VideoAdapter(
-    private val onClick: (VideoItem) -> Unit,
-    private val onLongClick: (VideoItem) -> Unit
-) : RecyclerView.Adapter<VideoAdapter.VH>() {
-
+class VideoAdapter(private val onClick: (VideoItem) -> Unit, private val onLongClick: (VideoItem) -> Unit) : RecyclerView.Adapter<VideoAdapter.VH>() {
     private var data: List<VideoItem> = emptyList()
     val current: List<VideoItem> get() = data
-
-    fun submit(list: List<VideoItem>) {
-        data = list
-        notifyDataSetChanged()
-    }
-
+    fun submit(list: List<VideoItem>) { data = list; notifyDataSetChanged() }
     class VH(val b: ItemVideoBinding) : RecyclerView.ViewHolder(b.root)
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
-        VH(ItemVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH = VH(ItemVideoBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     override fun getItemCount() = data.size
-
     override fun onBindViewHolder(holder: VH, position: Int) {
         val item = data[position]
         holder.b.tvName.text = item.title
@@ -397,23 +296,12 @@ class VideoAdapter(
 
 data class FolderItem(val key: String, val name: String, val count: Int)
 
-class FolderAdapter(private val onClick: (FolderItem) -> Unit) :
-    RecyclerView.Adapter<FolderAdapter.VH>() {
-
+class FolderAdapter(private val onClick: (FolderItem) -> Unit) : RecyclerView.Adapter<FolderAdapter.VH>() {
     private var data: List<FolderItem> = emptyList()
-
-    fun submit(list: List<FolderItem>) {
-        data = list
-        notifyDataSetChanged()
-    }
-
+    fun submit(list: List<FolderItem>) { data = list; notifyDataSetChanged() }
     class VH(val b: ItemFolderBinding) : RecyclerView.ViewHolder(b.root)
-
-    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH =
-        VH(ItemFolderBinding.inflate(LayoutInflater.from(parent.context), parent, false))
-
+    override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): VH = VH(ItemFolderBinding.inflate(LayoutInflater.from(parent.context), parent, false))
     override fun getItemCount() = data.size
-
     override fun onBindViewHolder(holder: VH, position: Int) {
         val f = data[position]
         holder.b.tvFolderName.text = f.name
