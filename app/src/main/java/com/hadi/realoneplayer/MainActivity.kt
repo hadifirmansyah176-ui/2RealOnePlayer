@@ -376,6 +376,8 @@ class MainActivity : AppCompatActivity() {
         }
         .show()
 }
+}
+
 
 class VideoAdapter(
     private val onClick: (VideoItem) -> Unit,
