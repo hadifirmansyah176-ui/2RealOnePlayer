@@ -359,17 +359,13 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-   private fun openVideo(item: VideoItem) {
+    private fun openVideo(item: VideoItem) {
     Playlist.items = adapter.current
     startActivity(
         Intent(this, PlayerActivity::class.java)
             .putExtra("id", item.id)
     )
 }
-        .show()
-}
-}
-
 
 class VideoAdapter(
     private val onClick: (VideoItem) -> Unit,
