@@ -366,6 +366,7 @@ class MainActivity : AppCompatActivity() {
             .putExtra("id", item.id)
     )
 }
+}
 
 class VideoAdapter(
     private val onClick: (VideoItem) -> Unit,
