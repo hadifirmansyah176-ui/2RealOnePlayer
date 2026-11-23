@@ -61,7 +61,7 @@ class PlayerActivity : AppCompatActivity() {
     private var autoSubDone = false
     private var userDisabledSub = false
 
-    // Bass / penguat suara hingga 200%
+    // Bass / penguat suara hingga 300%
     private var bassOn = false
     private var enhancer: LoudnessEnhancer? = null
     private var bassBoost: BassBoost? = null
@@ -133,7 +133,6 @@ class PlayerActivity : AppCompatActivity() {
         player.setHandleAudioBecomingNoisy(true)
         b.playerView.player = player
 
-        // Gaya subtitle: Calibri (Carlito), kuning dengan garis tepi hitam, bawah tengah.
         val typeface = try {
             ResourcesCompat.getFont(this, R.font.calibri)
         } catch (_: Exception) {
@@ -148,7 +147,6 @@ class PlayerActivity : AppCompatActivity() {
                     CaptionStyleCompat.EDGE_TYPE_OUTLINE, Color.BLACK, typeface
                 )
             )
-            // Ukuran otomatis menyesuaikan tinggi layar (~18sp pada layar HP landscape)
             setFractionalTextSize(SubtitleView.DEFAULT_TEXT_SIZE_FRACTION)
             setBottomPaddingFraction(0.06f)
         }
@@ -233,7 +231,6 @@ class PlayerActivity : AppCompatActivity() {
             .build()
     }
 
-    /** Cari file subtitle dengan nama sama di folder video (jika bisa dibaca). */
     @Suppress("DEPRECATION")
     private fun findSiblingSubtitle(item: VideoItem): File? {
         val path = item.path ?: return null
@@ -242,8 +239,7 @@ class PlayerActivity : AppCompatActivity() {
             try {
                 val f = File("$base.$ext")
                 if (f.exists() && f.canRead()) return f
-            } catch (_: Exception) {
-            }
+            } catch (_: Exception) {}
         }
         return null
     }
@@ -253,9 +249,7 @@ class PlayerActivity : AppCompatActivity() {
             val i = c.getColumnIndex(OpenableColumns.DISPLAY_NAME)
             if (c.moveToFirst() && i >= 0) c.getString(i) else null
         }
-    } catch (_: Exception) {
-        null
-    }
+    } catch (_: Exception) { null }
 
     private fun selectTextGroup(g: Tracks.Group) {
         userDisabledSub = false
@@ -264,8 +258,6 @@ class PlayerActivity : AppCompatActivity() {
             .setOverrideForType(TrackSelectionOverride(g.mediaTrackGroup, 0))
             .build()
     }
-
-    // -------------------------------------------------------------------- UI
 
     private fun setupUi() {
         b.touchLayer.setOnClickListener { setControlsVisible(!controlsVisible) }
@@ -298,12 +290,7 @@ class PlayerActivity : AppCompatActivity() {
             override fun onProgressChanged(sb: SeekBar?, progress: Int, fromUser: Boolean) {
                 if (fromUser) b.tvCur.text = fmtTime(progress.toLong())
             }
-
-            override fun onStartTrackingTouch(sb: SeekBar?) {
-                seeking = true
-                handler.removeCallbacks(hideRunnable)
-            }
-
+            override fun onStartTrackingTouch(sb: SeekBar?) { seeking = true; handler.removeCallbacks(hideRunnable) }
             override fun onStopTrackingTouch(sb: SeekBar?) {
                 seeking = false
                 player.seekTo((sb?.progress ?: 0).toLong())
@@ -316,15 +303,11 @@ class PlayerActivity : AppCompatActivity() {
             Prefs.setBass(this, bassOn)
             applyBass(player.audioSessionId)
             updateBassIcon()
-            Toast.makeText(this, if (bassOn) "Bass 200% aktif" else "Bass 200% nonaktif", Toast.LENGTH_SHORT).show()
+            Toast.makeText(this, if (bassOn) "Bass 300% aktif" else "Bass 300% nonaktif", Toast.LENGTH_SHORT).show()
             setControlsVisible(true)
         }
 
-        b.btnSub.setOnClickListener {
-            showSubtitleDialog()
-            setControlsVisible(true)
-        }
-
+        b.btnSub.setOnClickListener { showSubtitleDialog(); setControlsVisible(true) }
         b.btnLock.setOnClickListener {
             locked = !locked
             b.btnLock.setImageResource(if (locked) R.drawable.ic_lock else R.drawable.ic_unlock)
@@ -336,11 +319,8 @@ class PlayerActivity : AppCompatActivity() {
         updateVolumeUi()
     }
 
-    // ------------------------------------------------------------- volume
-
     private val audioManager by lazy { getSystemService(AUDIO_SERVICE) as AudioManager }
 
-    /** Naik/turun volume TANPA menampilkan panel volume bawaan HP (flag = 0). */
     private fun changeVolume(up: Boolean) {
         audioManager.adjustStreamVolume(
             AudioManager.STREAM_MUSIC,
@@ -359,14 +339,10 @@ class PlayerActivity : AppCompatActivity() {
         b.volBar.level = pct
     }
 
-    /** Tekan sekali = satu langkah; tahan = terus berubah. */
     @SuppressLint("ClickableViewAccessibility")
     private fun setupVolumeButton(v: View, up: Boolean) {
         val repeat = object : Runnable {
-            override fun run() {
-                changeVolume(up)
-                handler.postDelayed(this, 120)
-            }
+            override fun run() { changeVolume(up); handler.postDelayed(this, 120) }
         }
         v.setOnTouchListener { view, ev ->
             when (ev.actionMasked) {
@@ -384,7 +360,6 @@ class PlayerActivity : AppCompatActivity() {
         }
     }
 
-    // Tombol volume fisik HP: ditangani sendiri agar panel bawaan tidak muncul (kecuali layar terkunci)
     override fun onKeyDown(keyCode: Int, event: KeyEvent?): Boolean {
         if (!locked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
             changeVolume(keyCode == KeyEvent.KEYCODE_VOLUME_UP)
@@ -394,9 +369,7 @@ class PlayerActivity : AppCompatActivity() {
     }
 
     override fun onKeyUp(keyCode: Int, event: KeyEvent?): Boolean {
-        if (!locked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) {
-            return true
-        }
+        if (!locked && (keyCode == KeyEvent.KEYCODE_VOLUME_UP || keyCode == KeyEvent.KEYCODE_VOLUME_DOWN)) return true
         return super.onKeyUp(keyCode, event)
     }
 
@@ -424,7 +397,6 @@ class PlayerActivity : AppCompatActivity() {
             b.seekBar.progress = pos.toInt()
             b.tvCur.text = fmtTime(pos)
         }
-        // simpan posisi tiap ~2 detik
         if (++tick % 4 == 0) saveNow()
     }
 
@@ -457,30 +429,27 @@ class PlayerActivity : AppCompatActivity() {
                     which == labels.size - 1 -> pickSubtitle.launch(arrayOf("*/*"))
                     else -> selectTextGroup(groups[which - 1])
                 }
-            }
-            .show()
+            }.show()
     }
 
-    // ------------------------------------------------------------- bass 200%
+    // ------------------------------------------------------------- bass 300%
 
     private fun applyBass(sessionId: Int) {
         releaseEffects()
         if (sessionId == C.AUDIO_SESSION_ID_UNSET || sessionId == 0) return
         try {
-            // +6 dB (600 mB) = amplitudo 2x = 200%
+            // +9.54 dB ≈ amplitudo 3x = 300%
             enhancer = LoudnessEnhancer(sessionId).apply {
-                setTargetGain(600)
+                setTargetGain(950)
                 setEnabled(bassOn)
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
         try {
             bassBoost = BassBoost(0, sessionId).apply {
                 if (strengthSupported) setStrength(1000.toShort())
                 setEnabled(bassOn)
             }
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
     }
 
     private fun releaseEffects() {
@@ -490,9 +459,6 @@ class PlayerActivity : AppCompatActivity() {
         bassBoost = null
     }
 
-    // ---------------------------------------------- orientasi otomatis
-
-    /** Video landscape -> layar landscape, video potret -> layar potret. */
     private fun applyOrientation(w: Int, h: Int, rotation: Int = 0) {
         if (w <= 0 || h <= 0) return
         val portrait = if (rotation == 90 || rotation == 270) w > h else h > w
@@ -501,7 +467,7 @@ class PlayerActivity : AppCompatActivity() {
         if (requestedOrientation != target) requestedOrientation = target
     }
 
-    /** Baca ukuran video lebih awal supaya layar langsung berputar sebelum video tampil. */
+    @Suppress("DEPRECATION")
     private fun preDetectOrientation(item: VideoItem) {
         try {
             val r = MediaMetadataRetriever()
@@ -511,11 +477,8 @@ class PlayerActivity : AppCompatActivity() {
             val rot = r.extractMetadata(MediaMetadataRetriever.METADATA_KEY_VIDEO_ROTATION)?.toIntOrNull() ?: 0
             r.release()
             applyOrientation(w, h, rot)
-        } catch (_: Exception) {
-        }
+        } catch (_: Exception) {}
     }
-
-    // ------------------------------------------------------------- lifecycle
 
     private fun saveNow() {
         if (!exiting && ::player.isInitialized && ::items.isInitialized) {
@@ -529,10 +492,7 @@ class PlayerActivity : AppCompatActivity() {
         finish()
     }
 
-    override fun onPause() {
-        super.onPause()
-        saveNow()
-    }
+    override fun onPause() { super.onPause(); saveNow() }
 
     override fun onStop() {
         super.onStop()
