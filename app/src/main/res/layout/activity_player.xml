@@ -219,6 +219,22 @@
         </LinearLayout>
     </FrameLayout>
 
+    <!-- Indikator kecerahan saat geser layar -->
+    <TextView
+        android:id="@+id/tvBright"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:background="@drawable/bg_indicator"
+        android:paddingStart="20dp"
+        android:paddingTop="10dp"
+        android:paddingEnd="20dp"
+        android:paddingBottom="10dp"
+        android:textColor="#FFFFFF"
+        android:textSize="18sp"
+        android:textStyle="bold"
+        android:visibility="gone" />
+
     <!-- Tombol kunci layar: terpisah agar tetap bisa dibuka saat terkunci -->
     <ImageButton
         android:id="@+id/btnLock"
