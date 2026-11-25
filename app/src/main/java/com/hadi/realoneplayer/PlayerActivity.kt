@@ -16,7 +16,7 @@ import android.os.Handler
 import android.os.Looper
 import android.provider.OpenableColumns
 import android.provider.Settings
-import android.view.GestureDetector
+import android.view.ViewConfiguration
 import android.view.KeyEvent
 import android.view.MotionEvent
 import android.view.View
@@ -348,33 +348,39 @@ class PlayerActivity : AppCompatActivity() {
     /** Ketuk = tampil/sembunyi tombol. Geser atas/bawah = kecerahan naik/turun. */
     @SuppressLint("ClickableViewAccessibility")
     private fun setupGestures() {
-        val gd = GestureDetector(this, object : GestureDetector.SimpleOnGestureListener() {
-            override fun onDown(e: MotionEvent?): Boolean {
-                gestureDecided = false
-                gestureVertical = false
-                return true
-            }
-
-            override fun onSingleTapUp(e: MotionEvent?): Boolean {
-                setControlsVisible(!controlsVisible)
-                return true
-            }
-
-            override fun onScroll(e1: MotionEvent?, e2: MotionEvent?, dx: Float, dy: Float): Boolean {
-                if (locked) return true                       // layar terkunci: abaikan geseran
-                if (!gestureDecided) {
-                    gestureDecided = true
-                    gestureVertical = Math.abs(dy) > Math.abs(dx)
-                }
-                if (gestureVertical) {
-                    val h = b.touchLayer.height.coerceAtLeast(1)
-                    adjustBrightness(dy / (h * 0.8f))        // dy positif = geser ke atas
-                }
-                return true
-            }
-        })
+        val slop = ViewConfiguration.get(this).scaledTouchSlop
+        var downX = 0f
+        var downY = 0f
+        var lastY = 0f
+        var moved = false
         b.touchLayer.setOnTouchListener { _, ev ->
-            gd.onTouchEvent(ev)
+            when (ev.actionMasked) {
+                MotionEvent.ACTION_DOWN -> {
+                    downX = ev.x
+                    downY = ev.y
+                    lastY = ev.y
+                    moved = false
+                    gestureDecided = false
+                    gestureVertical = false
+                }
+                MotionEvent.ACTION_MOVE -> {
+                    val dx = ev.x - downX
+                    val dy = ev.y - downY
+                    if (!gestureDecided && (Math.abs(dx) > slop || Math.abs(dy) > slop)) {
+                        gestureDecided = true
+                        gestureVertical = Math.abs(dy) > Math.abs(dx)
+                        moved = true
+                    }
+                    if (gestureDecided && gestureVertical && !locked) {   // layar terkunci: abaikan geseran
+                        val h = b.touchLayer.height.coerceAtLeast(1)
+                        adjustBrightness((lastY - ev.y) / (h * 0.8f))     // geser ke atas = lebih terang
+                    }
+                    lastY = ev.y
+                }
+                MotionEvent.ACTION_UP -> {
+                    if (!moved) setControlsVisible(!controlsVisible)
+                }
+            }
             true
         }
     }
